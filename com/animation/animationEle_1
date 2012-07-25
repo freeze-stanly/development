@@ -1,0 +1,392 @@
+// JavaScript Document
+/*
+	movieClip -- 继承 TimeLine
+	graphic   --|
+	
+	
+	
+	animation -->stage - movieclip - graphic
+				 				   - moviclip
+				 				   - shape 
+	
+	Screen获取动画的屏幕大小 和FPS
+	param W width
+		  H height
+		  F	  
+		
+*/
+
+
+
+/*(function($A){
+
+	$A.nInstance('TimeLine.Time');
+	//var movieClip = $A.nClazz(function(){},);
+	
+	return (function(){
+		$A._package('animationEle');
+		$A._public();
+		})();
+	})($A);
+*/
+
+
+
+
+$A._package('animation.animationEle',function(){
+		$A._import('animation.TimeLine');
+		return function(){
+				//类引用快捷方式
+	var timeline = $A._clazz.animation.TimeLine;
+				
+	/*var DisplayObj = $A.newClazz(function(param){
+					timeline.Layer.call(this,param);
+					this.__setting.Matrix = param.Matrix || [0,0,0,0,1,0,false,false,1,1,true];
+									},timeline.Layer);*/
+	
+	var DisplayObj = function(param){
+			var param = param?param:{};
+			//Matrix [x,y,width,height,alpha,rotation,flipX,filpY,scaleX,scaleY,visible]
+			this.__setting = {
+				Matrix:param.Matrix || [0,0,0,0,1,0,false,false,1,1,true],
+				name:param.name || null,
+				enableplay:true,
+				//renderList:[]
+			};
+	};
+	$A._public('DisplayObj',DisplayObj);
+	
+	DisplayObj.prototype.__defineGetter__('enableplay',function(){return this.__setting.enableplay;});
+	DisplayObj.prototype.__defineSetter__('enableplay',function(str){this.__setting.enableplay = str;});
+	
+	DisplayObj.prototype.__defineGetter__('X',function(){return this.__setting.Matrix[0];});
+	DisplayObj.prototype.__defineSetter__('X',function(str){this.__setting.Matrix[0] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('Y',function(){return this.__setting.Matrix[1];});
+	DisplayObj.prototype.__defineSetter__('Y',function(str){this.__setting.Matrix[1] = str;});
+				
+	DisplayObj.prototype.__defineGetter__('W',function(){return this.__setting.Matrix[2];});
+	DisplayObj.prototype.__defineSetter__('W',function(str){this.__setting.Matrix[2]=str});
+				
+	DisplayObj.prototype.__defineGetter__('H',function(){return this.__setting.Matrix[3];});
+	DisplayObj.prototype.__defineSetter__('H',function(str){this.__setting.Matrix[3] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('alpha',function(){return this.__setting.Matrix[4];});
+	DisplayObj.prototype.__defineSetter__('alpha',function(str){this.__setting.Matrix[4] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('rotation',function(){return this.__setting.Matrix[5];});
+	DisplayObj.prototype.__defineGetter__('rotation',function(){this.__setting.Matrix[5] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('flipX',function(){return this.__setting.Matrix[6];});
+	DisplayObj.prototype.__defineGetter__('flipX',function(){this.__setting.Matrix[6] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('filpY',function(){return this.__setting.Matrix[7];});
+	DisplayObj.prototype.__defineGetter__('filpY',function(){this.__setting.Matrix[7] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('scaleX',function(){return this.__setting.Matrix[8];});
+	DisplayObj.prototype.__defineGetter__('scaleX',function(){this.__setting.Matrix[8] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('scaleY',function(){return this.__setting.Matrix[9];});
+	DisplayObj.prototype.__defineGetter__('scaleY',function(){this.__setting.Matrix[9] = str;});
+					
+	DisplayObj.prototype.__defineGetter__('visible',function(){return this.__setting.Matrix[10];});
+	DisplayObj.prototype.__defineGetter__('visible',function(){this.__setting.Matrix[10] = str;});
+	
+	DisplayObj.prototype.__defineGetter__('name',function(){return this.__setting.id;});
+	DisplayObj.prototype.__defineGetter__('name',function(str){this.__setting.id = str;});
+					
+	DisplayObj.prototype.render = function(){
+						
+		};
+	DisplayObj.prototype.clearRect = function(){
+		
+		};
+		
+				
+	var DisplayObjectContainer = $A.newClazz(function(param){
+									DisplayObj.call(this,param);
+									this.__setting.displayList = [];
+									this.__setting.pointer = 0;
+								},DisplayObj); 
+	DisplayObjectContainer.prototype.__defineGetter__('displayList',function(){return this.__setting.displayList;});
+	
+/*	DisplayObjectContainer.prototype.__defineGetter__('pointer',function(){return this.__setting.pointer;});
+	DisplayObjectContainer.prototype.__defineSetter__('pointer',function(str){
+			this.__setting.pointer = this.enableplay?parseInt(str):this.pointer;
+		}
+	);*/
+							
+	DisplayObjectContainer.prototype.pushChild = function(displayObj){
+			this.displayList.push(displayObj);
+		};
+	DisplayObjectContainer.prototype.deleteChild = function(param){
+			if(typeof(param) == 'number'){
+				this.splice(param,1);
+			}else{
+				
+			};
+		};
+	DisplayObjectContainer.prototype.addChildAt = function(displayObj,pos){
+			this.displayList.splice(pos,0,displayObj);
+		};
+	DisplayObjectContainer.prototype.removeAllChild = function(displayObj){
+			this.displayList = [];
+		};
+	DisplayObjectContainer.prototype.getChild = function(index){
+			return this.displayList[index];
+		};
+	DisplayObjectContainer.prototype.getIndex = function(displayObj){
+			var render = this.displayList,renderlength = render.length;
+			for(var i=0;i<renderlength;i++){
+				if(render[i] === displayObj){
+					return i;
+				};
+			};
+		};
+
+	DisplayObjectContainer.prototype.reverseChild = function(displayObj){
+			this.displayList.reverse();
+		};
+	
+						
+	var Stage = function(param){
+		var param = param?param:{};
+		this.__setting= {H:param.H || 0,W:param.W || 0,F:param.F,sceneList:[]};
+		var Container = document.createElement('div');
+		Container.id = 'Container';
+		Container.style.position = 'relative';
+		Container.style.width = this.__setting.W + 'px';
+		Container.style.height = this.__setting.H + 'px';
+		this.Container = Container;						
+		document.body.appendChild(Container);											
+	};
+	$A._public('Stage',Stage);
+	Stage.prototype.__defineGetter__('H',function(){return this.__setting.H;});
+	Stage.prototype.__defineSetter__('H',function(str){
+		this.__setting.H = str;
+	});
+				
+	Stage.prototype.__defineGetter__('W',function(){return this.__setting.W;});
+	Stage.prototype.__defineSetter__('W',function(str){
+		this.__setting.W = str;
+	});
+				
+	Stage.prototype.__defineGetter__('F',function(){return this.__setting.F;});
+	Stage.prototype.__defineSetter__('F',function(str){
+		this.__setting.F = str;
+	});
+	Stage.prototype.__defineGetter__('sceneList',function(){return this.__setting.sceneList;});
+	
+	Stage.prototype.addScene = function(scene){
+		var scenelistlength = this.sceneList.length+1;
+		var newScene = scene?scene:new Scene({id:'scene'+scenelistlength});
+		newScene.style.zIndex = scenelistlength;
+		newScene.__setting.H = newScene.height = this.H;
+		newScene.__setting.W = newScene.width = this.W;
+		newScene.parent = this;
+		this.Container.appendChild(newScene);
+		this.__setting.sceneList.unshift(newScene);
+		return newScene;
+	};	
+	Stage.prototype.selectStageById = function(stageId){
+		return document.getElementById('#'+stageId);
+	};
+	
+
+	/*场景类
+		H 
+		W
+		name
+	*/									
+	var Scene = function(param){
+		var param = param?param:{};
+		this.__setting = {H:0,W:0,id:param.id || null,mc:null};
+		var canvas = document.createElement('canvas');
+		canvas.innerHTML = 'SORRY U BROWER NOT SUPPORT CANVAS';
+		canvas.height = this.__setting.W;
+		canvas.width = this.__setting.H;
+		canvas.style.position = 'absolute';
+		canvas.style.top = canvas.style.left = 0;
+		canvas.id = this.__setting.id;
+		canvas.__setting = this.__setting;
+		var thisprototype = Scene.prototype;
+			for(var i in thisprototype){
+				canvas[i] = thisprototype[i];
+			};
+			canvas.ctx = canvas.getContext('2d'); 
+		
+			return canvas;
+		};
+		
+	$A._public('Scene',Scene);
+
+	Scene.prototype.addMc = function(mc){
+		mc.parent = this;
+		this.__setting.mc = mc;
+	};
+	Scene.prototype.getMc = function(){
+		return this.__setting.mc;	
+	};
+	Scene.prototype.removeMc = function(){
+		this.__setting.mc = null;
+	};
+	Scene.prototype.initMc = function(){
+		var initMc = new MovieClip({name:'initMc'});
+		this.getMc(initMc);
+		initMc.H = this.__setting.H;
+		initMc.W = this.__setting.W;
+		initMc.X = 0;
+		initMc.Y = 0;
+		return initMc;
+	};
+		
+		//必须有layer array
+		
+		
+		//MovieClip
+		/*var mc = $A.newClazz(function(param){
+										timeline.Layer.call(this,param);
+									},timeline.Layer);
+									
+		console.log(mc);*/
+		var MovieClip = $A.newClazz(function(param){
+										DisplayObjectContainer.call(this,param);
+									},DisplayObjectContainer);
+
+		$A._public('MovieClip',MovieClip);
+		MovieClip.prototype.addLayer = function(layer){
+				this.displayList.push(layer);
+				layer.parent = this;
+				return layer;
+			};
+		MovieClip.prototype.getLayer = function(name){
+			var displayList = this.displayList,displayListlength = displayList.length;
+			for(var i=0;i<displayListlength;i++){
+				if(name == displayList[i].name){
+					return displayList[i];
+				};
+			};
+		};
+
+		MovieClip.prototype.run = function(){
+			var displayList = this.displayList,displayListlength = displayList.length;
+			for(var i=0;i<displayListlength;i++){
+				var timeline = displayList[i].timeline;
+				//timeline.pointer = this.pointer;
+				timeline.play();
+			};
+		};
+
+	
+		//Graphic
+		var Graphic = $A.newClazz(function(param){
+										DisplayObjectContainer.call(this,param);
+									},DisplayObjectContainer); 
+		$A._public('Graphic',Graphic);
+		
+		
+		
+				
+		/*//shape
+		var Graphic = $A.newClazz(function(param){
+										DisplayObjectContainer.call(this,param);
+									},DisplayObjectContainer);
+		$A._public('Graphic',Graphic);*/
+		
+		
+		//Shape 用来存放单张的图片或是FUN
+		
+		
+		
+		var Shape = function(){
+					
+			var __setting = {//同CANVAS.DRAWIMAGE参数定义相同  私有变量
+							image:null,
+							sx:0 || arguments[1],
+							sy:0 || arguments[2],
+							sw:0 || arguments[3],
+							sh:0 || arguments[4],
+							dx:0 || arguments[5],
+							dy:0 || arguments[6],
+							dw:0 || arguments[7],
+							dh:0 || arguments[8],
+							fun:null || arguments[9],
+							context:null
+						};
+			if(typeof(arguments[0]) == 'function'){
+				__setting.fun = arguments[0];
+			}else{
+				__setting.image = arguments[0];	
+			};
+			
+			var Shape = function(){};
+			
+			Shape.prototype.draw = function(){
+					this.fun();
+					if(this.image != null){
+						this.context.drawImage(this.image,this.sx,this.sy,this.sw,this.sh,this.dx,this.dy,this.dw,this.dh);
+					};					
+				};
+			Shape.prototype.destory = function(){
+					//Scene.ctx.clearRect(50,50,150,150);
+					this.context.clearRect(this.dx,this.dy,this.dw,this.dh);
+				};
+			Shape.prototype.__defineGetter__('context',function(){return __setting.context;});
+			Shape.prototype.__defineSetter__('context',function(str){
+											__setting.context = str;
+								});
+			
+			Shape.prototype.__defineGetter__('image',function(){return __setting.image;});
+			Shape.prototype.__defineSetter__('image',function(str){
+											__setting.image = str;
+								});
+			Shape.prototype.__defineGetter__('sx',function(){return __setting.sx;});
+			Shape.prototype.__defineSetter__('sx',function(str){
+											__setting.sx = str;
+								});
+			Shape.prototype.__defineGetter__('sy',function(){return __setting.sy;});
+			Shape.prototype.__defineSetter__('sy',function(str){
+											__setting.sy = str;
+								});
+			Shape.prototype.__defineGetter__('sw',function(){return __setting.sw;});
+			Shape.prototype.__defineSetter__('sw',function(str){
+											__setting.sw = str;
+								});
+			Shape.prototype.__defineGetter__('sh',function(){return __setting.sh;});
+			Shape.prototype.__defineSetter__('sh',function(str){
+											__setting.sh = str;
+								});
+			Shape.prototype.__defineGetter__('dx',function(){return __setting.dx;});
+			Shape.prototype.__defineSetter__('dx',function(str){
+											__setting.dx = str;
+								});
+			Shape.prototype.__defineGetter__('dy',function(){return __setting.dy;});
+			Shape.prototype.__defineSetter__('dy',function(str){
+											__setting.dy = str;
+								});
+			Shape.prototype.__defineGetter__('dw',function(){return __setting.dw;});
+			Shape.prototype.__defineSetter__('dw',function(str){
+											__setting.dw = str;
+								});
+			Shape.prototype.__defineGetter__('dh',function(){return __setting.dh;});
+			Shape.prototype.__defineSetter__('dh',function(str){
+											__setting.dh = str;
+								});	
+			Shape.prototype.__defineGetter__('fun',function(){return __setting.fun;});
+			Shape.prototype.__defineSetter__('fun',function(str){
+											__setting.dh = str;
+								});	
+			return new Shape();
+		};
+		$A._public('Shape',Shape);
+	}
+});
+
+		
+		//console.log('doEle = '+ $A._tasklist.length);
+//	})($A);
+
+
+
+
+

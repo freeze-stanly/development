@@ -1,0 +1,788 @@
+// JavaScript Document
+/*
+****************************************************************************
+				          |-->TimeLine  --> clip,clip,clip
+		mc -->  layer --> |-->TimeLine
+					      |-->TimeLine
+		
+		TimeLine/clip 内有pointer 用以记录当前对象被播放到第几帧
+		
+		
+	定义接口 带考虑
+		param name 接口对象的名字
+			  function 	
+			  pro
+			  
+				
+	function interface(param){
+			
+		};
+****************************************************************************
+
+
+
+
+
+	作用：clip	 在时间轴 Timeline对象中的单个剪辑
+	--------------------------------------------------------------------------------------
+				 pointer/start/end 因为array 第一帧 为0 start/end值出的要减1
+				 
+				 统一接受的start end pointer均为假帧数值
+				 
+				 实际轴		0|1|2|3|4|5|6|7
+				 虚假轴		1|2|3|4|5|6|7|8
+				 ex start = 1 end =3
+		废		 real startFrame = 0
+				 	  endFrame = 2
+					  lengthFrame = 3
+			     pointer 
+				 ex clip 
+				 		 start = 2
+						 end = 5
+						 startFrame = 1
+				 		 endFrame = 4
+						 length = 4
+					now  playFrame = 3
+						 realplayerFrame = 2
+						 pointer = realplayerFrame - startFrame+1
+	-------------------------------------------------------------------------------------
+				轴		    0|1|2|3|4|5|6|7|……
+				
+	CLAZZ---Clip   装载shape的容器
+	constructor
+		param:	parent	default null   				when Time add Clip set parent
+				shape	default null  param.shape	可为空 或是action
+				start 	default 0     param.start
+				length  default 1	  param.length
+				name 	default null  param.name
+				status  default []    param.status
+				pointer default 0     param.pointer
+				end		default this.__setting.start+this.__setting.length-1
+				
+		__setting 用来放私有变量
+				
+	prototype
+				get/set name          set name when parent have like name set fault 
+				get/set parent		  装载Clip的容器
+				get/set end
+				get/set start
+				get/set length
+				get/set shape		  Clip 内的渲染对象
+				get/set status
+				get/set pointer		  pointer  Clip 的内部指针	
+				
+	Function    createMotionClip	  用于设置变形动画
+				reverseClip 		  翻转Clip
+				Clone				  CLONE Clip
+				addShape
+				replaceShape
+				reverseClip
+				setKeyFrame
+				MotionTween
+				draw				
+	Event		onPlayEnd			
+				
+		
+*/
+$A._package('animation.TimeLine',function(){
+		//$A._import('animation.test2');insert _import
+		return function(){
+			
+var TimeFrame = function(param){
+	var param=param?param:{};
+	this.__setting = {
+			parent:null,
+			length:param.length || 1,
+			start:param.start || 0, 
+			pointer:param.pointer || 0,
+		};
+};
+
+			
+
+var Clip = function(param){
+		var param=param?param:{};
+		this.__setting = {parent:null,
+						  length:param.length || 1,
+						  start:param.start || 0, 
+						  shape:param.shape || null,
+						  name:param.name || null,
+						  status:[] || param.status,
+						  pointer:param.pointer || 0,
+						  end:param.start?param.start+param.length-1:0,
+						  motion:false		  
+						  };
+	};
+
+Clip.prototype.__defineGetter__('parent',function(){return this.__setting.parent;});
+Clip.prototype.__defineSetter__('parent',function(str){
+										this.__setting.parent = str;
+									});
+
+Clip.prototype.__defineGetter__('name',function(){return this.__setting.name;});
+Clip.prototype.__defineSetter__('name',function(str){
+											var parent = this.parent;
+											var clip = parent.cliplist;
+											var cliplength = clip.length;
+											var enable = true;
+											checkname:for(var i=0;i<cliplength;i++){
+														if(clip[i].name == str){
+																enable = false;
+																break checkname;
+														};
+												};
+											if(enable){
+												this.__setting.name = str;	
+											}else{
+												console.log('clipname is exist');
+											};
+									});
+									  
+Clip.prototype.__defineGetter__('end',function(){return this.__setting.end;});
+Clip.prototype.__defineSetter__('end',function(str){this.__setting.end = parseInt(str)<=0?0:parseInt(str);
+									  this.__setting.length = this.__setting.end-this.__setting.start+1;});
+
+Clip.prototype.__defineGetter__('start',function(){return this.__setting.start;});
+Clip.prototype.__defineSetter__('start',function(str){this.__setting.start = parseInt(str)<=0?0:parseInt(str);
+									  this.__setting.length = this.__setting.end-this.__setting.start+1;});
+									  
+Clip.prototype.__defineGetter__('length',function(){return this.__setting.length;});
+Clip.prototype.__defineSetter__('length',function(str){this.__setting.length = parseInt(str);
+									  this.__setting.end = this.__setting.start+this.__setting.length -1;});
+									  
+Clip.prototype.__defineGetter__('shape',function(){return this.__setting.shape;});
+Clip.prototype.__defineSetter__('shape',function(str){this.__setting.shape = parseInt(str);});
+
+									  
+Clip.prototype.__defineGetter__('status',function(){return this.__setting.status;});
+Clip.prototype.__defineSetter__('status',function(str){this.__setting.status = str;});
+
+Clip.prototype.__defineGetter__('pointer',function(){return this.__setting.pointer;});
+Clip.prototype.__defineSetter__('pointer',function(str){
+												var pointer = parseInt(str)<=0?0:parseInt(str);
+												var start = this.start;
+												this.__setting.pointer = pointer>start?start:pointer;
+												if(pointer == this.end && typeof(onPlayEnd) == 'function'){
+														this.onPlayEnd();
+													};
+										});
+Clip.prototype.addShape = function(shape,matrix){
+		this.__setting.shape = shape;
+		this.__setting.status = matrix;
+	};
+Clip.prototype.replaceShape = function(shape){
+		this.__setting.shape = shape;
+	};
+
+Clip.prototype.Clone = function(){
+	function clone(parent,child){
+		var i,
+		toStr = Object.prototype.toString,
+		astr = "[object Array]";
+		
+		child = child || {};
+		for(i in parent){
+			if(parent.hasOwnProperty(i)){
+				if(typeof parent[i] === 'object' && parent[i] != null){
+					child[i] = (toStr.call(parent[i]) === astr)?[]:{};
+					arguments.callee(parent[i],child[i]);
+				}else{
+					child[i] = parent[i];
+				};
+			};
+		};
+		return child;
+	};
+	var tempclone = clone(this);
+	
+	return tempclone;
+ };    
+	
+Clip.prototype.setKeyFrame = function(frameNum,Matrix,tween){
+		if(this.__setting.motion == true){
+			var status = this.setting.status;
+			var hadtieme = frameNum - this.start;
+			this.status[0] = status;
+			this.tween = tween;
+			var x = this.tween();
+			var y = this.tween();
+			
+		}else{
+			var cloneclip = this.Clone(),start=this.start,end=this.end;
+			switch(frameNum){
+				case start:
+					this.end = frameNum;
+					cloneclip.start = frameNum+1;
+				break;
+				case  this.end:
+					this.end -=1;
+					cloneclip.start = frameNum;
+				break;
+				default:
+					this.end = frameNum-1;
+					cloneclip.start = frameNum;
+			};
+			return cloneclip;
+		};
+	};
+Clip.prototype.MotionTween = function(){
+		this.__setting.motion = this.__setting.motion == true?false:true;
+	};
+Clip.prototype.reverseClip = function(){
+		this.status.reverse();
+	};
+Clip.prototype.addListenerEvent =function(Event,callback){
+		this[Event] = callback;
+	};
+Clip.prototype.onPlayEnd = null;
+Clip.prototype.play = function(){
+		var point = this.pointer;
+		var status = this.status;	
+		this.shape.draw();
+		console.log(this.shape);
+	};
+
+/*
+	作用：TimeLine表示是单个layer的对象
+		  get parent    获取夫对象
+		  get timeline  获取layer上的对象数组
+		  get length    layer 总帧数
+		  get/set name	layer name时间轴的name
+		  				set/get name	 set通过parent获取其父元素。然后循环是否唯一
+
+		  get getlastclip 获取最后element
+		  get/set pointer 
+	
+	param:.parent 所属对象
+		  .name   
+		  .length default 0																				``````````````
+	function:
+		  getClipIndex			param clip		根据CLIP 对象获取索引
+		  						param num       根据帧数获取CLIP对象的索引 num 为假轴上的帧 需要-1
+								
+		  selectClipByFrameNum  param num		根据帧来获取lay中的clip对象
+		  	
+		  addClip               param start 	插入帧
+		  						param length 	插入长度
+								param shape 	shape/sprite/mc/graphic/img clip内的对象
+								
+		  removeClip       		param clip/framenum
+		  
+		  moveClip				param			clip  move
+		  
+		  setClipLength			param clip/framenum start 不变 end length 变
+			 						  length/end
+									  
+	CLAZZ -- Time		时间轴类 用于添加Clip
+		  param cliplist  default []
+		  		parent 	  default null when parent add setting 
+				name	  default null
+				pointer   default 0
+		  prototype 
+		  		get/set parent
+				get/set cliplist
+				get 	length
+				get		getlastclip	 得到最后的一个CLIP
+				get/set name
+				get/set pointer
+		  
+		  Function selectClipByFrameNum  num  帧数 获取Clip
+		  		   Index == clip.start
+		  		   checkExistClip		start end   Clip的start,end来判断Clip在Time内是否存在
+				   checkPointClip		num         判断帧数 上是否有Clip
+				   addClip				param		已设置start,end的Clip
+				   removeClip			clipindex   Clip的索引经行删除
+				   moveClip				param.target Clip或是clip.start
+				   						param.num    移动的目标帧
+				   setClipLength		param.clip   Clip 或是clip.start
+				   setClipName			param.clip 	 Clip 或是clip.start
+
+*/
+var Time = function(param){
+	var param=param?param:{};
+		this.__setting = {
+					cliplist:[],
+					parent:null,
+					name:param.name || null,
+					pointer:0,
+					enableplay:true
+			};
+	};
+
+Time.prototype.__defineGetter__('enableplay',function(){return this.__setting.parent;});
+Time.prototype.__defineSetter__('enableplay',function(str){this.__setting.parent = str;});
+
+Time.prototype.__defineGetter__('parent',function(){return this.__setting.parent;});
+Time.prototype.__defineSetter__('parent',function(str){this.__setting.parent = str;});
+
+Time.prototype.__defineGetter__('length',function(){
+					var length = this.getLastClip.end?this.getLastClip.end+1:1;									
+					return length;
+				});
+Time.prototype.__defineGetter__('getlastclip',function(){	
+					var lastchild = this.cliplist;
+					var lastchildlength = lastchild.length;
+					return lastchild[lastchildlength-1];	
+				});
+
+Time.prototype.__defineGetter__('cliplist',function(){return this.__setting.cliplist;});
+Time.prototype.__defineSetter__('cliplist',function(str){this.__setting.cliplist = str;});
+
+Time.prototype.__defineGetter__('name',function(){return this.__setting.name;});
+Time.prototype.__defineSetter__('name',function(str){
+											this.__setting.name = str;
+										});
+										
+	
+Time.prototype.__defineGetter__('pointer',function(){
+	return this.__setting.pointer;
+	});
+Time.prototype.__defineSetter__('pointer',function(str){
+												var pointer = parseInt(str)<=0?0:parseInt(str);
+												this.__setting.pointer = pointer;
+												if(pointer == this.end && onPlayEnd){
+														this.onPlayEnd();
+													};
+												
+										});
+										
+Time.prototype.addListenerEvent =function(Event,callback){
+		this[Event] = callback;
+	};
+Time.prototype.onPlayEnd = null;
+
+Time.prototype.draw = function(){
+		var point = this.pointer;
+		var clip = this.selectClipByFrameNum(point);
+		clip.pointer = point;
+		clip.draw();
+	};
+	
+Time.prototype.selectClipByFrameNum = function(num){
+		var index = this.checkPointClip(num);
+		return this.cliplist[index];
+	};
+	/*		
+		param clip
+	*/
+/*Time.prototype.getClipIndex = function(clip){
+		var clipstart = clip.start,
+		clipend = clip.end;
+		return 	this.checkExistClip(clipstart,clipend);	
+	};*/
+	/*
+		num clipindex
+	*/
+/*Time.prototype.getClipByIndex = function(num){
+		return this.cliplist[num];
+	};	*/
+	
+Time.prototype.checkExistClip = function(start,end){
+	
+/*		var tempclip = this.cliplist,
+		tempcliplength = tempclip.length,position = -1;
+		
+		checkClipPosition:for(var i=0;i<tempcliplength;i++){
+			var target = tempclip[i];
+					
+				if((start>=target.start && start<= target.end) || ( end >= target.start && end <= target.end) || (start < target.start && end > target.end)){
+					position = i;
+					break checkClipPosition;
+				};
+			
+		};*/
+		
+		var tempclip = this.cliplist,position = -1;
+		
+		function isExist(ele,index,array){
+			if((start>=ele.start && start<= ele.end) || ( end >= ele.start && end <= ele.end) || (start < ele.start && end > ele.end)){
+					position = index;
+					return true;
+			};			
+		};
+		var ss = tempclip.some(isExist);
+		
+		
+		return position;		
+	};
+	
+Time.prototype.checkPointClip = function(num){
+/*		var tempclip = this.cliplist;
+		var tempcliplength = tempclip.length;
+		var 
+		for(var i =0;i<tempcliplength;i++){
+			if((targetnum>= tempclip[i].start && targetnum <= tempclip[i].end)){				
+					return i;
+			};
+		};*/
+		
+		
+		var tempclip = this.cliplist,position = null,targetnum = parseInt(num)<0?0:parseInt(num);
+		
+		function isExist(ele,index,array){
+			//if((start>=ele.start && start<= ele.end) || ( end >= ele.start && end <= ele.end) || (start < ele.start && end > ele.end)){
+			if((targetnum>= ele.start && targetnum <= ele.end)){	
+					position = index;
+					return true;
+			};			
+		};
+		var ss = tempclip.some(isExist);
+		
+		
+		return position;
+		
+	};
+	/*
+		param.start
+		param.end/param.length
+		param.shape shape/sprite/mc/graphic/img
+		
+		param = Clip
+	*/
+Time.prototype.addClip = function(param){
+/*	if(Array.isArray(param) || !param){		
+		var param = param?param:{},
+		_this = this,
+		tempclip = this.cliplist,
+		tempcliplength = tempclip.length,
+		clipstart = param.start?param.start:0,
+		cliplength = param.length?param.length:1,
+		clipend = param.end?param.end:cliplength+clipstart-1;
+		
+		/*checkClipPosition:for(var i=0;i<tempcliplength;i++){
+			if((clipstart>=ele.start && clipstart<= ele.end) || ( clipend >= ele.start && clipend <= ele.end)){
+				anble = false;
+				break checkClipPosition;
+			};
+		};*/
+		/*var anble = this.checkExistClip(clipstart,clipend);
+		if(anble == -1){
+			tempclip[clipstart] = new Clip({parent:_this,length:cliplength,start:clipstart,shape:param.shape});
+			return tempclip[clipstart];
+		}else{
+			console.log('addClip error');
+		};
+	}else{*/
+		var clip = param,tempclip = this.cliplist,
+		anble = this.checkExistClip(clip.start,clip.end);
+		if(anble == -1){
+			tempclip[clip.start] = clip;
+			clip.parent = this;
+			return clip;
+		}else{
+			console.log('have');	
+		};
+	//};
+		/*
+		//var cliplength = param.length?param.length:param.end-param.start+1;
+		function isExist(ele,i,array){
+				return (clipstart>=ele.start && clipstart<= ele.end) || ( clipend >= ele.start && clipend <= ele.end) || (clipstart <= ele.start && clipend>= ele.end);
+			};
+		addEnable = tempclip.some(isExist);
+					
+		if(addEnable == false){
+				tempclip[clipstart] = new Clip({parent:_this,length:cliplength,start:clipstart,shape:param.shape});		
+		}else{
+			console.log('addClip error');
+		};*/
+				
+};
+
+	/*	
+		clipindex
+	*/
+Time.prototype.removeClip = function(clipindex){
+		var tempclip = this.cliplist;
+		delete tempclip[clipindex];
+		var lastclip = typeof(this.getlastclip) == 'undefined'?-1:this.getlastclip.start;
+		tempclip.splice(lastclip+1);
+		
+		/*var clip;
+		if(typeof(param) == 'number'){
+			clip = this.getClipByIndex(param);
+		}else{
+			clip = param;
+		};
+		
+		var index = (typeof(param) == "number")?this.getClipIndex({num:param}):this.getClipIndex({clip:param});
+		var tempclip = this.cliplist;
+		delete tempclip[index];
+		var lastclip = typeof(this.getlastclip) == 'undefined'?-1:this.getlastclip.start;*/
+			//end后的数组
+	};
+
+	/*
+		param target clip/start
+			  clipstart num
+	*/
+Time.prototype.moveClip = function(param){
+		//if(param.target){
+			var clip = typeof(param.target) == 'number'?this.cliplist[param.target]:param.target;
+		
+			var	movestart = param.num,
+			moveend = param.num + clip.length,
+			position = this.checkExistClip(movestart,moveend);
+			
+			if(position == -1 || clip == this.cliplist[position]){
+				 this.removeClip(clip.start);
+				 this.cliplist[movestart] = clip;
+				 clip.start = movestart;
+			}else{
+				console.log('moveClip dont move');
+			};
+		//};
+		/*var clip = param.framenum?this.selectClipByFrameNum(param.framenum):param.clip;
+		var cliplength = clip.length;
+		var movestart = param.movenum;
+		var moveend = cliplength-1+movestart;
+		var tempclip = this.cliplist;
+		var addEnable = true;
+		
+		function isExist(ele,i,array){
+				if(clip != ele){
+					return (movestart>=ele.start && movestart<= ele.end) || ( moveend >= ele.start && moveend <= ele.end) || (movestart <= ele.start && moveend>= ele.end);
+				};
+			};
+		addEnable = tempclip.some(isExist);
+		
+		if(addEnable == false){
+			this.removeClip(clip);
+			this.cliplist[movestart] = clip;
+			var length = clip.length;
+			clip.start = movestart;
+			clip.length = length;
+
+		}else{
+			console.log('moveClip error');
+		};*/
+	};
+	/*		
+		param clip/start 
+			  length
+	*/
+Time.prototype.setClipLength = function(param){
+		//if(param.clip){
+			var clip = typeof(param.clip) == 'number'?this.cliplist[param.clip]:param.clip,
+			length = parseInt(param.length),tempclip = this.cliplist,end=clip.start + length,start=clip.start;
+			var pos = this.checkPointClip(end);
+			if(clip == this.cliplist[pos] || !pos){
+				clip.length = length;
+			}else{
+				console.log('setClipLength error');
+			};
+		//};
+		/*
+		var index = this.selectClipByFrameNum(end);
+		if(index){
+			var targetClip = this.getClipByIndex(index);
+			if(targetClip == clip){
+				
+			};
+		}else{
+			clip.end = end;	
+		};
+		
+		
+	
+		var clip = param.framenum?this.selectClipByFrameNum(param.framenum):param.clip;
+		var tempclip = this.cliplist;
+		var moveend = param.length?clip.start+param.length -1:param.end;
+		var movestart = param.start;
+		var addEnable = true;
+		
+		function isExist(ele,i,array){
+				if(clip != ele){
+					return (movestart>=ele.start && movestart<= ele.end) || ( moveend >= ele.start && moveend <= ele.end) || (movestart <= ele.start && moveend>= ele.end);
+				};
+			};
+		addEnable = tempclip.some(isExist);
+		
+		if(addEnable == false){
+			clip.end = moveend;
+		}else{
+			console.log('setClipLength error');
+		};*/		
+	};
+	/*
+		param clip/start
+			  name
+	*/
+Time.prototype.setClipName = function(param){
+
+	//if(param.clip){
+		var clip = typeof(param.clip) == 'number'?this.cliplist[param.clip]:param.clip,name= param.name,cliplist = this.cliplist,cliplistlength = cliplist.length,enble=true;
+		for(var i =0;i<cliplistlength;i++){
+			var clipname = cliplist[i].name;
+			if(name == clipname){
+				enble = false;
+			};
+			
+			if(enble == true){
+				clip.name = name;
+			}else{
+				console.log('setClipName error');
+			};
+			
+		};
+	//};
+};
+Time.prototype.play = function(){
+		var point = this.pointer += 1;
+		var clip = this.selectClipByFrameNum(point);
+		this.enableplay = true;
+		if(clip){
+			clip.pointer = point;
+			clip.play();
+		};
+	};
+Time.prototype.stop = function(){
+		this.enableplay = false;
+	};
+Time.prototype.gotoAndStop = function(){
+	
+	};
+Time.prototype.gotoAndPlay = function(){
+	
+	};
+Time.prototype.nextFrame = function(){
+	
+	};
+Time.prototype.uppFrame = function(){
+	
+	};
+		
+		/*
+		var clip = param.framenum?this.selectClipByFrameNum(param.framenum):param.clip;
+		var clipname = param.name;
+		var tempclip = this.cliplist;
+		var addEnable = true;
+		
+		function isExist(ele,i,array){
+				if(clip != ele){
+					return (ele.name == clipname);
+				};
+			};
+		addEnable = tempclip.some(isExist);
+		
+		if(addEnable == false){
+			clip.__setting.name = clipname;
+		}else{
+			console.log('setClipLength error');
+		};
+	};
+	
+	
+	
+	/*
+		Layer 作用 用作层的记录 
+			get layer
+			set/get name	 set通过parent获取其父元素。然后循环是否唯一
+		param name
+			  parent 
+		function addLayer 添加TimeLine层 默认会新建一个TimeLine对象 TimeLine内会默认新建一个长为1 start & end 为0 其余为空的clip对象     
+				 selectLayerByName  name 
+	*/
+var Layer = function(param){
+		var param=param?param:{};
+		this.__setting = {name:param.name || null,
+						  parent:null, 
+						  timeline:null
+						};
+
+	};
+//Layer.prototype.__defineGetter__('layer',function(){return this.__setting.layer;});
+
+Layer.prototype.__defineGetter__('name',function(){return this.__setting.name;});
+//检查在其父元素中是否有同名的Layer
+Layer.prototype.__defineSetter__('name',function(str){
+							var parent = this.parent;
+							
+							var templayer = parent.layer;
+							var templayerlength = templayer.length;
+							var addEnable = true;
+							
+							checkrepeat:for(var i =0;i<templayerlength;i++){
+								if(templayer[i].name == str){
+									addEnable = false;
+									break checkrepeat;
+								};
+							};
+							if(addEnable == true){
+								this.__setting.name = str;
+							}else{
+								console.log('Layersetname is exist');
+							};
+						});
+Layer.prototype.__defineGetter__('parent',function(){return this.__setting.parent;});
+Layer.prototype.__defineSetter__('parent',function(str){
+							this.__setting.parent = str;
+						});
+						
+Layer.prototype.__defineGetter__('timeline',function(){
+							return this.__setting.timeline;
+						});
+Layer.prototype.__defineSetter__('timeline',function(str){
+							return this.__setting.timeline = str;
+						});
+	/*
+		param empty
+ 
+	*/
+Layer.prototype.addTimeAxis = function(time){
+			var timeline = time;
+			timeline.parent = this;
+			timeline.name = this.name + 'Axis';
+			this.timeline = timeline;
+			return timeline;
+		
+	};
+	
+
+	/*
+		param @layername
+	
+Layer.prototype.selectLayerByName = function(layername){
+		var templayer = this.layer;
+		var havelayer = false;
+		var targetlayer;
+		function getLayer(ele,i,array){
+			if(ele.name = layername){
+				targetlayer = ele;
+			};
+			return (ele.name == layername);
+		};
+		havelayer = templayer.some(getLayer);
+		if(havelayer == true){
+			return targetlayer;
+		}else{
+			console.log('selectLayerByName error');
+		};
+	};*/
+	/*
+		param @layername
+	
+Layer.prototype.getLayerIndexByName = function(layername){
+		var templayer = this.layer;
+		var havelayer = false;
+		var targetlayer;
+		function getLayer(ele,i,array){
+			if(ele.name = layername){
+				targetlayer = i;//get index
+			};
+			return (ele.name == layername);
+		};
+		havelayer = templayer.some(getLayer);
+		if(havelayer == true){
+			return targetlayer;
+		}else{
+			console.log('getLayerIndexByName error');
+		};
+	};*/
+	$A._public('Clip',Clip);
+	$A._public('Time',Time);
+	$A._public('Layer',Layer);
+				};
+});
+	
+//		console.log('doTimeline = '+ $A._tasklist.length);
+//})($A);//);
